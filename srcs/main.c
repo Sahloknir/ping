@@ -6,7 +6,7 @@
 /*   By: axbal <marvin@42.fr>                       +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2021/09/10 13:28:51 by axbal             #+#    #+#             */
-/*   Updated: 2021/09/12 18:00:47 by axbal            ###   ########.fr       */
+/*   Updated: 2021/09/13 12:50:22 by axbal            ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -95,7 +95,7 @@ int		gethostinfo(char *host) {
 	ft_putnbr(opt);
 	ft_putstr("\n ^ socket option ^\n");
 	while (1) {
-		sent = sendto(sockfd, pkt, 56, 0, rp->ai_addr, sizeof(rp->ai_addr));
+		sent = sendto(sockfd, pkt, 56, 0, rp->ai_addr, sizeof(struct sockaddr_in));
 		printf("sent : %d\n", sent);
 		recv = recvfrom(sockfd, recv_buf, sizeof(recv_buf), 0, &sender, (unsigned int *)&sender_len);
 		printf("recieved : %d\n", recv);
