@@ -6,25 +6,14 @@
 /*   By: axbal <marvin@42.fr>                       +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2021/09/10 13:28:51 by axbal             #+#    #+#             */
-/*   Updated: 2021/09/13 12:50:22 by axbal            ###   ########.fr       */
+/*   Updated: 2021/09/13 15:23:04 by axbal            ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "ping.h"
-#include <netdb.h>
-#include <sys/socket.h>
-#include <netinet/ip_icmp.h>
-#include <netinet/ip.h>
-#include <netinet/in.h>
-#include <sys/types.h>
-#include <sys/cdefs.h>
-#include <stdio.h>
-#include <fcntl.h>
-#include <string.h>
-#include <errno.h>
 
-unsigned short cal_chksum(unsigned short *addr, int len)
-{
+/* penser a modifier le checksum */
+unsigned short		cal_chksum(unsigned short *addr, int len) {
     int nleft = len;
     int sum = 0;
     unsigned short *w = addr;
@@ -44,73 +33,127 @@ unsigned short cal_chksum(unsigned short *addr, int len)
     answer = ~sum;
     return answer;
 }
+/* penser a modifier le checksum */
 
-int		gethostinfo(char *host) {
-	struct addrinfo		hints;
-	struct addrinfo		*results, *rp;
-	int					pid;
-	int					r;
-	int					sockfd;
-	int					opt;
-	int					sockopt;
-	int					sent;
-	int					recv;
-	char				pkt_buf[4096];
-	char				recv_buf[64];
-	struct sockaddr		sender;
-	int					sender_len;
+void			print_request(void) {
+	int		pkt_size;
+	char	*hostname;
+	char	*host_addr;
+
+	pkt_size = 56;
+	hostname = "google.com";
+	host_addr = "142.250.179.110";
+
+	printf("PING %s (%s): %d data bytes\n", hostname, host_addr, pkt_size);
+}
+
+void			print_reply(int recv, int i_seq) {
+	char		*addr;
+	int			seq;
+	int			ttl;
+	float		time;
+
+	seq = i_seq;
+	addr = "1.1.1.1";
+	ttl = 57;
+	time = 1.025f;
+
+	printf("%d bytes from %s: icmp_seq=%d ttl=%d time=%f ms\n", recv, addr, seq, ttl, time);
+}
+
+struct icmp		*create_pkt(int seq, char *pkt_buf) {
 	struct icmp			*pkt;
 
-	pid = getpid();
+	pkt = (struct icmp*)pkt_buf;
+	pkt->icmp_type = ICMP_ECHO;
+	pkt->icmp_code = 0;
+	pkt->icmp_cksum = 0;
+	pkt->icmp_seq = seq;
+	pkt->icmp_id = getpid();
+	pkt->icmp_cksum = cal_chksum((unsigned short*)pkt, 56);
+	return (pkt);
+}
+
+int				send_pkt(int sockfd, struct addrinfo *rp, int seq) {
+	int				sent;
+	char			pkt_buf[4096];
+	struct icmp		*pkt;
+
+	pkt = create_pkt(seq, pkt_buf);
+	if ((sent = sendto(sockfd, pkt, 56, 0, rp->ai_addr, sizeof(struct sockaddr_in))) < 0)
+		ft_putstr_fd("error : couldn't send packet\n", 2);
+	return (sent);
+}
+
+int				recv_pkt(int sockfd, int seq) {
+	int					recv;
+	char				recv_buf[64];
+	struct sockaddr		rep_addr;
+	int					rep_len;
+
+	rep_len = sizeof(rep_addr);
+	if ((recv = recvfrom(sockfd, recv_buf, sizeof(recv_buf), 0, &rep_addr, (unsigned int *)&rep_len)) < 0) {
+		ft_putstr_fd("error : recvfrom error\n", 2);
+	} else {
+		print_reply(recv, seq);
+	}
+	return (recv);
+}
+
+int				ft_ping(int sockfd, struct addrinfo *rp) {
+	int			seq;
+
+	seq = 0;
+	print_request();
+	while (1) {
+		if (send_pkt(sockfd, rp, seq) < 0)
+			return (-1);
+		if (recv_pkt(sockfd, seq) < 0)
+			return (-1);
+		seq++;
+		sleep(1);
+	}
+	return (0);
+}
+
+int				gethostinfo(char *host) {
+	struct addrinfo		hints;
+	struct addrinfo		*results, *rp;
+	int					sockfd;
+	int					sockopt;
+
 	ft_memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_RAW;
 	hints.ai_flags = AI_PASSIVE;
 	hints.ai_protocol = 1;
 
-	r = getaddrinfo(host, NULL, &hints, &results);
-	ft_putnbr(r);
-	ft_putstr("\n^ addrinfo ^\n");
+	getaddrinfo(host, NULL, &hints, &results);
 	// gerer les erreurs des retours de getaddrinfo()
 
-	pkt = (struct icmp*)pkt_buf;
-	pkt->icmp_type = ICMP_ECHO;
-	pkt->icmp_code = 0;
-	pkt->icmp_cksum = 0;
-	pkt->icmp_seq = 0;
-	pkt->icmp_id = pid;
-	pkt->icmp_cksum = cal_chksum((unsigned short*)pkt, 56);
-	sender_len = sizeof(sender);
 	for (rp = results; rp != NULL; rp = rp->ai_next) {
 		sockfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-		ft_putnbr(sockfd);
-		ft_putstr("\n^ sockfd ^\n");
 		if (sockfd > 0) {
 			break;
 		}
 		// gerer les erreurs
 	}
-	sockopt = 50 * 1024;
-	opt = setsockopt(sockfd, SOL_SOCKET, SO_RCVBUF, &sockopt, sizeof(sockopt));
-	ft_putnbr(opt);
-	ft_putstr("\n ^ socket option ^\n");
-	while (1) {
-		sent = sendto(sockfd, pkt, 56, 0, rp->ai_addr, sizeof(struct sockaddr_in));
-		printf("sent : %d\n", sent);
-		recv = recvfrom(sockfd, recv_buf, sizeof(recv_buf), 0, &sender, (unsigned int *)&sender_len);
-		printf("recieved : %d\n", recv);
-		sleep(1);
-	}
 	freeaddrinfo(results);
+	sockopt = 50 * 1024;
+	setsockopt(sockfd, SOL_SOCKET, SO_RCVBUF, &sockopt, sizeof(sockopt));
+	// gerer les erreurs
+
+	//resolve_host(rp);
+	printf("sa_family : %d\nsa_data: %s\n", rp->ai_family, rp->ai_addr->sa_data);
+	ft_ping(sockfd, rp);
 	return (0);
 }
 
-int		main(int argc, char **argv) {
+int				main(int argc, char **argv) {
 	if (argc != 2) {
 		return (-1);
 	}
 	else {
-		//setuid(getuid());
 		gethostinfo(argv[1]);
 	}
 	return (0);
