@@ -6,7 +6,7 @@
 /*   By: axbal <marvin@42.fr>                       +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2021/09/10 13:28:51 by axbal             #+#    #+#             */
-/*   Updated: 2021/09/14 12:47:46 by axbal            ###   ########.fr       */
+/*   Updated: 2021/09/14 13:52:16 by axbal            ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -41,13 +41,11 @@ void			print_request() {
 	printf("PING %s (%s): %d data bytes\n", stats.host, stats.host_addr, PKT_SIZE);
 }
 
-void			print_reply(int recv, int seq, const char *addr) {
+void			print_reply(int recv, int seq, const char *addr, float rtt) {
 	int			ttl;
-	float		time;
 
 	ttl = 57;
-	time = 1.025f;
-	printf("%d bytes from %s: icmp_seq=%d ttl=%d time=%f ms\n", recv, addr, seq, ttl, time);
+	printf("%d bytes from %s: icmp_seq=%d ttl=%d time=%.3f ms\n", recv, addr, seq, ttl, rtt);
 }
 
 void			print_truc(int sig) {
@@ -90,31 +88,37 @@ int				send_pkt(int sockfd, struct addrinfo *rp, int seq) {
 	return (sent);
 }
 
-int				recv_pkt(int sockfd, int seq, const char *host_addr) {
+int				recv_pkt(int sockfd, int seq, const char *host_addr, struct timeval time_sent) {
 	int					recv;
+	struct timeval		time_recv;
 	char				recv_buf[64];
 	struct sockaddr		rep_addr;
 	int					rep_len;
+	float				rtt;
 
 	rep_len = sizeof(rep_addr);
 	if ((recv = recvfrom(sockfd, recv_buf, sizeof(recv_buf), 0, &rep_addr, (unsigned int *)&rep_len)) < 0) {
 		ft_putstr_fd("error : recvfrom error\n", 2);
 	} else {
-		print_reply(recv, seq, host_addr);
+		gettimeofday(&time_recv, NULL);
+		rtt = (float)((float)(time_recv.tv_usec - time_sent.tv_usec)) / 1000.0;
+		print_reply(recv, seq, host_addr, rtt);
 	}
 	return (recv);
 }
 
 int				ft_ping(int sockfd, struct addrinfo *rp) {
-	int			seq;
+	int				seq;
+	struct timeval	sent;
 
 	seq = 0;
 	print_request();
 	while (1) {
 		signal(SIGINT, print_truc);
+		gettimeofday(&sent, NULL);
 		if (send_pkt(sockfd, rp, seq) < 0)
 			return (-1);
-		if (recv_pkt(sockfd, seq, stats.host_addr) < 0)
+		if (recv_pkt(sockfd, seq, stats.host_addr, sent) < 0)
 			return (-1);
 		seq++;
 		sleep(1);
