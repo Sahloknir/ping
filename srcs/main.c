@@ -6,11 +6,13 @@
 /*   By: axbal <marvin@42.fr>                       +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2021/09/10 13:28:51 by axbal             #+#    #+#             */
-/*   Updated: 2021/09/13 16:48:21 by axbal            ###   ########.fr       */
+/*   Updated: 2021/09/14 12:47:46 by axbal            ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "ping.h"
+
+struct s_stats		stats;
 
 /* penser a modifier le checksum */
 unsigned short		cal_chksum(unsigned short *addr, int len) {
@@ -35,8 +37,8 @@ unsigned short		cal_chksum(unsigned short *addr, int len) {
 }
 /* penser a modifier le checksum */
 
-void			print_request(const char *host_addr, char *host) {
-	printf("PING %s (%s): %d data bytes\n", host, host_addr, PKT_SIZE);
+void			print_request() {
+	printf("PING %s (%s): %d data bytes\n", stats.host, stats.host_addr, PKT_SIZE);
 }
 
 void			print_reply(int recv, int seq, const char *addr) {
@@ -49,7 +51,18 @@ void			print_reply(int recv, int seq, const char *addr) {
 }
 
 void			print_truc(int sig) {
-	printf("--- %d ping statistics ---\n", sig);
+	float		percent;
+	float		tmp;
+
+	tmp = 0.0;
+	stats.pkts_sent = 5;
+	stats.pkts_recv = 3;
+	stats.rtt = &tmp;
+	percent = (float)(100.0 - (((float)stats.pkts_recv / (float)stats.pkts_sent) * 100.0));
+	printf("\n--- %s ping statistics ---\n", stats.host);
+	printf("%d packets transmitted, %d packets received, %.1f%% packet loss\n", stats.pkts_sent, stats.pkts_recv, percent);
+	printf("round-trip min/avg/max = %.3f/%.3f/%.3f ms\n", *stats.rtt, *stats.rtt, *stats.rtt);
+	sig = 0;
 	exit(0);
 }
 
@@ -92,16 +105,16 @@ int				recv_pkt(int sockfd, int seq, const char *host_addr) {
 	return (recv);
 }
 
-int				ft_ping(int sockfd, struct addrinfo *rp, const char *host_addr, char *host) {
+int				ft_ping(int sockfd, struct addrinfo *rp) {
 	int			seq;
 
 	seq = 0;
-	print_request(host_addr, host);
+	print_request();
 	while (1) {
 		signal(SIGINT, print_truc);
 		if (send_pkt(sockfd, rp, seq) < 0)
 			return (-1);
-		if (recv_pkt(sockfd, seq, host_addr) < 0)
+		if (recv_pkt(sockfd, seq, stats.host_addr) < 0)
 			return (-1);
 		seq++;
 		sleep(1);
@@ -109,14 +122,14 @@ int				ft_ping(int sockfd, struct addrinfo *rp, const char *host_addr, char *hos
 	return (0);
 }
 
-const char		*resolve_host(struct addrinfo *rp) {
+void			resolve_host(struct addrinfo *rp) {
 	char				*ret;
 	struct sockaddr_in	*host_addr;
 
 	host_addr = (struct sockaddr_in *)rp->ai_addr;
 
 	ret = malloc(sizeof(char) * 128);
-	return (inet_ntop(AF_INET, &host_addr->sin_addr, ret, sizeof(char) * 128));
+	stats.host_addr = inet_ntop(AF_INET, &host_addr->sin_addr, ret, sizeof(char) * 128);
 }
 
 int				gethostinfo(char *host) {
@@ -146,7 +159,8 @@ int				gethostinfo(char *host) {
 	setsockopt(sockfd, SOL_SOCKET, SO_RCVBUF, &sockopt, sizeof(sockopt));
 	// gerer les erreurs
 
-	ft_ping(sockfd, rp, resolve_host(rp), host);
+	resolve_host(rp);
+	ft_ping(sockfd, rp);
 	return (0);
 }
 
@@ -155,6 +169,7 @@ int				main(int argc, char **argv) {
 		return (-1);
 	}
 	else {
+		stats.host = argv[1];
 		gethostinfo(argv[1]);
 	}
 	return (0);

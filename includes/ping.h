@@ -6,7 +6,7 @@
 /*   By: axbal <marvin@42.fr>                       +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2021/09/10 13:28:33 by axbal             #+#    #+#             */
-/*   Updated: 2021/09/13 16:16:27 by axbal            ###   ########.fr       */
+/*   Updated: 2021/09/14 12:21:55 by axbal            ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -44,5 +44,13 @@
 # include <arpa/inet.h>
 
 # define PKT_SIZE 56
+
+struct				s_stats {
+	char			*host;
+	const char		*host_addr;
+	unsigned int	pkts_sent;
+	unsigned int	pkts_recv;
+	float			*rtt;
+};
 
 #endif
