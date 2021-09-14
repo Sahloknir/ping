@@ -6,7 +6,7 @@
 /*   By: axbal <marvin@42.fr>                       +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2021/09/10 13:28:51 by axbal             #+#    #+#             */
-/*   Updated: 2021/09/14 13:52:16 by axbal            ###   ########.fr       */
+/*   Updated: 2021/09/14 16:19:10 by axbal            ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -41,25 +41,23 @@ void			print_request() {
 	printf("PING %s (%s): %d data bytes\n", stats.host, stats.host_addr, PKT_SIZE);
 }
 
-void			print_reply(int recv, int seq, const char *addr, float rtt) {
+void			print_reply(int recv, int seq, float rtt) {
 	int			ttl;
 
 	ttl = 57;
-	printf("%d bytes from %s: icmp_seq=%d ttl=%d time=%.3f ms\n", recv, addr, seq, ttl, rtt);
+	printf("%d bytes from %s: icmp_seq=%d ttl=%d time=%.3f ms\n", recv, stats.host_addr, seq, ttl, rtt);
 }
 
-void			print_truc(int sig) {
+void			print_stats(int sig) {
 	float		percent;
 	float		tmp;
 
 	tmp = 0.0;
-	stats.pkts_sent = 5;
-	stats.pkts_recv = 3;
 	stats.rtt = &tmp;
 	percent = (float)(100.0 - (((float)stats.pkts_recv / (float)stats.pkts_sent) * 100.0));
 	printf("\n--- %s ping statistics ---\n", stats.host);
 	printf("%d packets transmitted, %d packets received, %.1f%% packet loss\n", stats.pkts_sent, stats.pkts_recv, percent);
-	printf("round-trip min/avg/max = %.3f/%.3f/%.3f ms\n", *stats.rtt, *stats.rtt, *stats.rtt);
+	printf("round-trip min/avg/max = %.3f/%.3f/%.3f ms\n", 0.0, 0.0, 0.0);
 	sig = 0;
 	exit(0);
 }
@@ -88,7 +86,7 @@ int				send_pkt(int sockfd, struct addrinfo *rp, int seq) {
 	return (sent);
 }
 
-int				recv_pkt(int sockfd, int seq, const char *host_addr, struct timeval time_sent) {
+int				recv_pkt(int sockfd, int seq, struct timeval time_sent) {
 	int					recv;
 	struct timeval		time_recv;
 	char				recv_buf[64];
@@ -102,7 +100,7 @@ int				recv_pkt(int sockfd, int seq, const char *host_addr, struct timeval time_
 	} else {
 		gettimeofday(&time_recv, NULL);
 		rtt = (float)((float)(time_recv.tv_usec - time_sent.tv_usec)) / 1000.0;
-		print_reply(recv, seq, host_addr, rtt);
+		print_reply(recv, seq, rtt);
 	}
 	return (recv);
 }
@@ -114,12 +112,14 @@ int				ft_ping(int sockfd, struct addrinfo *rp) {
 	seq = 0;
 	print_request();
 	while (1) {
-		signal(SIGINT, print_truc);
+		signal(SIGINT, print_stats);
 		gettimeofday(&sent, NULL);
 		if (send_pkt(sockfd, rp, seq) < 0)
 			return (-1);
-		if (recv_pkt(sockfd, seq, stats.host_addr, sent) < 0)
+		stats.pkts_sent++;
+		if (recv_pkt(sockfd, seq, sent) < 0)
 			return (-1);
+		stats.pkts_recv++;
 		seq++;
 		sleep(1);
 	}
@@ -131,7 +131,6 @@ void			resolve_host(struct addrinfo *rp) {
 	struct sockaddr_in	*host_addr;
 
 	host_addr = (struct sockaddr_in *)rp->ai_addr;
-
 	ret = malloc(sizeof(char) * 128);
 	stats.host_addr = inet_ntop(AF_INET, &host_addr->sin_addr, ret, sizeof(char) * 128);
 }
@@ -174,6 +173,8 @@ int				main(int argc, char **argv) {
 	}
 	else {
 		stats.host = argv[1];
+		stats.pkts_sent = 0;
+		stats.pkts_recv = 0;
 		gethostinfo(argv[1]);
 	}
 	return (0);
