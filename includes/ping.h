@@ -51,6 +51,9 @@ struct				s_stats {
 	unsigned int	pkts_sent;
 	unsigned int	pkts_recv;
 	float			*rtt;
+	int				rtt_min;
+	int				rtt_max;
+	float			rtt_avg;
 };
 
 #endif
