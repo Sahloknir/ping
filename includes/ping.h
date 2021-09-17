@@ -10,7 +10,6 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-
 #ifndef PING_H
 # define PING_H
 
@@ -28,6 +27,13 @@
 # include <signal.h>
 
 # define PKT_SIZE 56
+# define ERROR_TIME "failed to get current time\n"
+# define ERROR_ADDR_INFO "failed to get host informations\n"
+# define ERROR_SOCKET "failed to open socket\n"
+# define ERROR_SOCK_OPT "failed to set socket option(s)\n"
+# define ERROR_MALLOC "failed to allocate memory\n"
+# define ERROR_SEND "failed to send packet\n"
+# define ERROR_RECV "failed to receive packet\n"
 
 struct				s_stats {
 	char			*host;

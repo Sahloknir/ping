@@ -37,18 +37,21 @@ unsigned short		cal_chksum(unsigned short *addr, int len) {
 }
 /* penser a modifier le checksum */
 
-void			print_request() {
+void				handle_error(const char *error) {
+	ft_putstr_fd(ft_strjoin("ERROR : ", error), 2);
+	printf("errno : %d\n", errno);
+	exit(-1);
+}
+
+void				print_request() {
 	printf("PING %s (%s): %d data bytes\n", stats.host, stats.host_addr, PKT_SIZE);
 }
 
-void			print_reply(int recv, int seq, float rtt) {
-	int			ttl;
-
-	ttl = 57;
+void				print_reply(int recv, int seq, float rtt, int ttl) {
 	printf("%d bytes from %s: icmp_seq=%d ttl=%d time=%.3f ms\n", recv, stats.host_addr, seq, ttl, rtt);
 }
 
-void			set_rtt_stats() {
+void				set_rtt_stats() {
 	unsigned int	i;
 	float			rtt_sum;
 	float			rtt_sum2;
@@ -76,7 +79,7 @@ void			set_rtt_stats() {
 	stats.rtt_mdev = (float)(rtt_sum2 / i);
 }
 
-void			print_stats(int sig) {
+void				print_stats(int sig) {
 	float		percent;
 
 	percent = (float)(100.0 - (((float)stats.pkts_recv / (float)stats.pkts_sent) * 100.0));
@@ -88,7 +91,7 @@ void			print_stats(int sig) {
 	exit(sig);
 }
 
-void			add_to_stats(float rtt) {
+void				add_to_stats(float rtt) {
 	unsigned int	i;
 	float			*tmp;
 
@@ -104,7 +107,7 @@ void			add_to_stats(float rtt) {
 	stats.rtt = tmp;
 }
 
-struct icmp		*create_pkt(int seq, char *pkt_buf) {
+struct icmp			*create_pkt(int seq, char *pkt_buf) {
 	struct icmp			*pkt;
 
 	pkt = (struct icmp*)pkt_buf;
@@ -117,19 +120,20 @@ struct icmp		*create_pkt(int seq, char *pkt_buf) {
 	return (pkt);
 }
 
-int				send_pkt(int sockfd, struct addrinfo *rp, int seq) {
+int					send_pkt(int sockfd, struct addrinfo *rp, int seq) {
 	int				sent;
 	char			pkt_buf[4096];
 	struct icmp		*pkt;
 
 	pkt = create_pkt(seq, pkt_buf);
+//	printf("sokfd : %d\n", cal_chksum((unsigned short*)rp->ai_addr, sizeof(struct sockaddr_in)));
 	if ((sent = sendto(sockfd, pkt, PKT_SIZE, 0, rp->ai_addr, sizeof(struct sockaddr_in))) < 0)
-		ft_putstr_fd("error : couldn't send packet\n", 2);
+		handle_error(ERROR_SEND);
 	stats.pkts_sent++;
 	return (sent);
 }
 
-int				recv_pkt(int sockfd, int seq, struct timeval time_sent) {
+int					recv_pkt(int sockfd, int seq, struct timeval time_sent) {
 	int					recv;
 	struct timeval		time_recv;
 	char				recv_buf[64];
@@ -139,26 +143,71 @@ int				recv_pkt(int sockfd, int seq, struct timeval time_sent) {
 
 	rep_len = sizeof(rep_addr);
 	if ((recv = recvfrom(sockfd, recv_buf, sizeof(recv_buf), 0, &rep_addr, (unsigned int *)&rep_len)) < 0) {
-		ft_putstr_fd("error : recvfrom error\n", 2);
+		handle_error(ERROR_RECV);
 	} else {
-		gettimeofday(&time_recv, NULL);
+		if (gettimeofday(&time_recv, NULL) < 0)
+			handle_error(ERROR_TIME);
 		rtt = (float)((float)(time_recv.tv_usec - time_sent.tv_usec)) / 1000.0;
 		stats.pkts_recv++;
 		add_to_stats(rtt);
-		print_reply(recv, seq, rtt);
+		print_reply(recv, seq, rtt, 57);
 	}
 	return (recv);
 }
 
-int				ft_ping(int sockfd, struct addrinfo *rp) {
-	int				seq;
-	struct timeval	sent;
+void				resolve_host(struct addrinfo *rp) {
+	char				*ret;
+	struct sockaddr_in	*host_addr;
 
+	host_addr = (struct sockaddr_in *)rp->ai_addr;
+	if (!(ret = malloc(sizeof(char) * 128)))
+		handle_error(ERROR_MALLOC);
+	if (!(stats.host_addr = inet_ntop(AF_INET, &host_addr->sin_addr, ret, sizeof(char) * 128)))
+		handle_error("inet_ntop\n");
+}
+
+struct addrinfo		*gethostinfo(char *host, int *sockfd) {
+	struct addrinfo		hints;
+	struct addrinfo		*results;
+	struct addrinfo		*rp;
+	int					sockopt;
+	int					err;
+
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_RAW;
+	hints.ai_flags = 0;
+	hints.ai_protocol = 1;
+	if ((err = getaddrinfo(host, NULL, &hints, &results)) != 0) {
+		handle_error(ERROR_ADDR_INFO);
+	}
+	for (rp = results; rp != NULL; rp = rp->ai_next) {
+		*sockfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+		if (*sockfd > 0) {
+			break;
+		}
+		handle_error(ERROR_SOCKET);
+	}
+	freeaddrinfo(results);
+	sockopt = 50 * 1024;
+	if (setsockopt(*sockfd, SOL_SOCKET, SO_RCVBUF, &sockopt, sizeof(sockopt)) != 0)
+		handle_error(ERROR_SOCK_OPT);
+	return (rp);
+}
+
+int					ft_ping(char *host) {
+	int					seq;
+	int					sockfd;
+	struct timeval		sent;
+	struct addrinfo		*rp;
+
+	rp = gethostinfo(host, &sockfd);
+	resolve_host(rp);
 	seq = 0;
 	print_request();
 	while (1) {
 		signal(SIGINT, print_stats);
-		gettimeofday(&sent, NULL);
+		if (gettimeofday(&sent, NULL) < 0)
+			handle_error(ERROR_TIME);
 		if (send_pkt(sockfd, rp, seq) < 0)
 			return (-1);
 		if (recv_pkt(sockfd, seq, sent) < 0)
@@ -169,48 +218,7 @@ int				ft_ping(int sockfd, struct addrinfo *rp) {
 	return (0);
 }
 
-void			resolve_host(struct addrinfo *rp) {
-	char				*ret;
-	struct sockaddr_in	*host_addr;
-
-	host_addr = (struct sockaddr_in *)rp->ai_addr;
-	ret = malloc(sizeof(char) * 128);
-	stats.host_addr = inet_ntop(AF_INET, &host_addr->sin_addr, ret, sizeof(char) * 128);
-}
-
-int				gethostinfo(char *host) {
-	struct addrinfo		hints;
-	struct addrinfo		*results, *rp;
-	int					sockfd;
-	int					sockopt;
-
-	ft_memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_RAW;
-	hints.ai_flags = AI_PASSIVE;
-	hints.ai_protocol = 1;
-
-	getaddrinfo(host, NULL, &hints, &results);
-	// gerer les erreurs des retours de getaddrinfo()
-
-	for (rp = results; rp != NULL; rp = rp->ai_next) {
-		sockfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-		if (sockfd > 0) {
-			break;
-		}
-		// gerer les erreurs
-	}
-	freeaddrinfo(results);
-	sockopt = 50 * 1024;
-	setsockopt(sockfd, SOL_SOCKET, SO_RCVBUF, &sockopt, sizeof(sockopt));
-	// gerer les erreurs
-
-	resolve_host(rp);
-	ft_ping(sockfd, rp);
-	return (0);
-}
-
-int				main(int argc, char **argv) {
+int					main(int argc, char **argv) {
 	if (argc != 2) {
 		return (-1);
 	}
@@ -219,7 +227,7 @@ int				main(int argc, char **argv) {
 		stats.pkts_sent = 0;
 		stats.pkts_recv = 0;
 		stats.rtt = NULL;
-		gethostinfo(argv[1]);
+		ft_ping(argv[1]);
 	}
 	return (0);
 }
