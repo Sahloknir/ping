@@ -50,27 +50,30 @@ void			print_reply(int recv, int seq, float rtt) {
 
 void			set_rtt_stats() {
 	unsigned int	i;
-	float			rtt_min;
-	float			rtt_max;
 	float			rtt_sum;
+	float			rtt_sum2;
 
 	i = 0;
-	rtt_min = -1;
-	rtt_max = -1;
+	stats.rtt_min = -1;
+	stats.rtt_max = -1;
 	rtt_sum = 0.0;
 	while (i < stats.pkts_recv) {
-		if (rtt_min < 0 || stats.rtt[i] < rtt_min) {
-			rtt_min = stats.rtt[i];
-			stats.rtt_min = i;
-		}
-		if (rtt_max < 0 || stats.rtt[i] > rtt_max) {
-			rtt_max = stats.rtt[i];
-			stats.rtt_max = i;
-		}
+		if (stats.rtt_min < 0 || stats.rtt[i] < stats.rtt_min)
+			stats.rtt_min = stats.rtt[i];
+		if (stats.rtt_max < 0 || stats.rtt[i] > stats.rtt_max)
+			stats.rtt_max = stats.rtt[i];
 		rtt_sum += stats.rtt[i];
+		rtt_sum2 += stats.rtt[i] * stats.rtt[i];
 		i++;
 	}
 	stats.rtt_avg = rtt_sum / i;
+	i = 0;
+	rtt_sum2 = 0.0;
+	while (i < stats.pkts_recv) {
+		rtt_sum2 += ft_fabs(stats.rtt_avg - stats.rtt[i]);
+		i++;
+	}
+	stats.rtt_mdev = (float)(rtt_sum2 / i);
 }
 
 void			print_stats(int sig) {
@@ -80,7 +83,7 @@ void			print_stats(int sig) {
 	set_rtt_stats();
 	printf("\n--- %s ping statistics ---\n", stats.host);
 	printf("%d packets transmitted, %d packets received, %.1f%% packet loss\n", stats.pkts_sent, stats.pkts_recv, percent);
-	printf("rtt min/avg/max/mdev = %.3f/%.3f/%.3f ms\n", stats.rtt[stats.rtt_min], stats.rtt_avg, stats.rtt[stats.rtt_max]);
+	printf("rtt min/avg/max/mdev = %.3f/%.3f/%.3f/%.3f ms\n", stats.rtt_min, stats.rtt_avg, stats.rtt_max, stats.rtt_mdev);
 	sig = 0;
 	exit(sig);
 }

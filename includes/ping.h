@@ -18,30 +18,14 @@
 # include <netdb.h>
 # include <sys/socket.h>
 # include <sys/types.h>
-# include <sys/cdefs.h>
-# include <netinet/ip.h>
-# include <netinet/in.h>
-# include <netinet/ip_icmp.h>
-# include <string.h>
-# include <errno.h>
-# include <fcntl.h>
-# include <stdio.h>
-# include <stdlib.h>
-# include <stdio.h>
-# include <unistd.h>
-# include <string.h>
-# include <ctype.h>
-# include <sys/types.h>
-# include <sys/socket.h>
 # include <sys/time.h>
-# include <errno.h>
-# include <signal.h>
-# include <netdb.h>
-# include <netinet/in.h>
-# include <netinet/in_systm.h>
 # include <netinet/ip.h>
+# include <netinet/in.h>
 # include <netinet/ip_icmp.h>
 # include <arpa/inet.h>
+# include <errno.h>
+# include <stdio.h>
+# include <signal.h>
 
 # define PKT_SIZE 56
 
@@ -51,9 +35,10 @@ struct				s_stats {
 	unsigned int	pkts_sent;
 	unsigned int	pkts_recv;
 	float			*rtt;
-	int				rtt_min;
-	int				rtt_max;
+	float			rtt_min;
+	float			rtt_max;
 	float			rtt_avg;
+	float			rtt_mdev;
 };
 
 #endif

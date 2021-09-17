@@ -89,6 +89,7 @@ void				ft_lstaddend(t_list **alst, t_list *nw);
 void				ft_lstaddn(t_list **alst, t_list *nw, size_t n);
 void				ft_lstprint(t_list **alst);
 int					ft_abs(int nb);
+float				ft_fabs(float nb);
 void				ft_print_nbrs(int *tab, size_t size);
 int					ft_add(int a, int b);
 int					ft_sub(int a, int b);

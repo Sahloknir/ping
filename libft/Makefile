@@ -77,6 +77,7 @@ SRCS = ft_memset.c		\
 	   ft_lstaddn.c		\
 	   ft_lstprint.c	\
 	   ft_abs.c			\
+	   ft_fabs.c		\
 	   ft_print_nbrs.c	\
 	   ft_add.c			\
 	   ft_sub.c			\
